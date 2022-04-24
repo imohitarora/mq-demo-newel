@@ -1,39 +1,39 @@
-"use strict";
-//var AMQPClient = require('amqp10').Client;
-var AMQPClient = require("../lib").Client,
-  Promise = require("bluebird");
+// Load the AWS SDK for Node.js
+var AWS = require("aws-sdk");
+// Set the region
+AWS.config.update({ region: "REGION" });
+AWS.config.loadFromPath("./config.json");
 
-var uri = "amqp://some.host",
-  msgId = Math.floor(Math.random() * 10000),
-  client = new AMQPClient();
+// Create an SQS service object
+var sqs = new AWS.SQS({ apiVersion: "2012-11-05" });
 
-client
-  .connect(uri)
-  .then(function () {
-    return Promise.all([client.createReceiver("amq.topic"), client.createSender("amq.topic")]);
-  })
-  .spread(function (receiver, sender) {
-    receiver.on("errorReceived", function (err) {
-      console.log("error receiving: ", err);
-    });
-    receiver.on("message", function (message) {
-      console.log("received: ", message.body);
-      if (message.annotations) console.log("annotations: ", message.annotations);
-      if (message.body.dataValue === msgId) {
-        client.disconnect().then(function () {
-          console.log("received expected message, disconnected.");
-          process.exit(0);
-        });
+var queueURL = "https://sqs.us-east-1.amazonaws.com/301414145976/newel-sqs-q";
+
+var params = {
+  AttributeNames: ["SentTimestamp"],
+  MaxNumberOfMessages: 10,
+  MessageAttributeNames: ["All"],
+  QueueUrl: queueURL,
+  VisibilityTimeout: 20,
+  WaitTimeSeconds: 0,
+};
+
+sqs.receiveMessage(params, function (err, data) {
+  if (err) {
+    console.log("Receive Error", err);
+  } else if (data.Messages) {
+    console.log("Received", data.Messages.length, "messages");
+    console.log(data.Messages);
+    var deleteParams = {
+      QueueUrl: queueURL,
+      ReceiptHandle: data.Messages[0].ReceiptHandle,
+    };
+    sqs.deleteMessage(deleteParams, function (err, data) {
+      if (err) {
+        console.log("Delete Error", err);
+      } else {
+        console.log("Message Deleted", data);
       }
     });
-
-    var message = { dataString: "From Node", dataValue: msgId };
-    console.log("sending: ", message);
-    return sender.send(message).then(function (state) {
-      // this can be used to optionally track the disposition of the sent message
-      console.log("state: ", state);
-    });
-  })
-  .error(function (e) {
-    console.log("connection error: ", e);
-  });
+  }
+});
