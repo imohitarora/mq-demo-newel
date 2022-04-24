@@ -23,6 +23,7 @@ Icon
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+package-lock.json
 
 # Directories potentially created on remote AFP share
 .AppleDB
